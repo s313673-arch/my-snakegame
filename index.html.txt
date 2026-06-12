@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五關寶石貪食蛇</title>
+
+<style>
+body{
+    font-family: Arial,sans-serif;
+    background:#222;
+    color:white;
+    text-align:center;
+}
+
+h1{
+    color:gold;
+}
+
+#gameCanvas{
+    background:black;
+    border:3px solid gold;
+}
+
+.info{
+    margin:10px;
+    font-size:20px;
+}
+
+button{
+    padding:10px 20px;
+    font-size:18px;
+    margin:5px;
+    cursor:pointer;
+}
+
+#leaderboard{
+    width:300px;
+    margin:auto;
+    background:#333;
+    padding:10px;
+    border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🐍 五關寶石貪食蛇</h1>
+
+<div class="info">
+分數：<span id="score">0</span> |
+時間：<span id="timer">0</span> 秒 |
+關卡：<span id="level">1</span>
+</div>
+
+<canvas id="gameCanvas" width="500" height="500"></canvas>
+
+<br>
+<button onclick="startGame()">開始遊戲</button>
+
+<h2>🏆 前五名排行榜</h2>
+
+<div id="leaderboard">
+<ol id="rankList"></ol>
+</div>
+
+<script>
+
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+
+const box=25;
+
+let snake;
+let direction;
+let score;
+let timer;
+let level;
+let game;
+let gems=[];
+let timeInterval;
+
+const levelGoals=[3,5,7,10,15];
+
+function startGame(){
+
+clearInterval(game);
+clearInterval(timeInterval);
+
+snake=[{x:10,y:10}];
+direction="RIGHT";
+score=0;
+timer=0;
+level=1;
+
+document.getElementById("score").textContent=score;
+document.getElementById("timer").textContent=timer;
+document.getElementById("level").textContent=level;
+
+createGems();
+
+game=setInterval(draw,120);
+
+timeInterval=setInterval(()=>{
+timer++;
+document.getElementById("timer").textContent=timer;
+},1000);
+}
+
+function createGems(){
+
+gems=[];
+
+for(let i=0;i<levelGoals[level-1];i++){
+
+gems.push({
+x:Math.floor(Math.random()*20),
+y:Math.floor(Math.random()*20)
+});
+
+}
+}
+
+document.addEventListener("keydown",e=>{
+
+if(e.key==="ArrowUp"&&direction!="DOWN")
+direction="UP";
+
+if(e.key==="ArrowDown"&&direction!="UP")
+direction="DOWN";
+
+if(e.key==="ArrowLeft"&&direction!="RIGHT")
+direction="LEFT";
+
+if(e.key==="ArrowRight"&&direction!="LEFT")
+direction="RIGHT";
+
+});
+
+function draw(){
+
+ctx.fillStyle="black";
+ctx.fillRect(0,0,500,500);
+
+gems.forEach(gem=>{
+ctx.fillStyle="cyan";
+ctx.beginPath();
+ctx.arc(gem.x*box+12,gem.y*box+12,8,0,Math.PI*2);
+ctx.fill();
+});
+
+for(let i=0;i<snake.length;i++){
+
+ctx.fillStyle=i===0?"lime":"green";
+ctx.fillRect(snake[i].x*box,snake[i].y*box,box,box);
+}
+
+let headX=snake[0].x;
+let headY=snake[0].y;
+
+if(direction==="UP") headY--;
+if(direction==="DOWN") headY++;
+if(direction==="LEFT") headX--;
+if(direction==="RIGHT") headX++;
+
+if(
+headX<0||
+headY<0||
+headX>=20||
+headY>=20||
+collision(headX,headY,snake)
+){
+gameOver();
+return;
+}
+
+let ateGem=false;
+
+for(let i=0;i<gems.length;i++){
+
+if(headX===gems[i].x && headY===gems[i].y){
+
+gems.splice(i,1);
+
+score+=10;
+
+document.getElementById("score").textContent=score;
+
+ateGem=true;
+
+break;
+}
+}
+
+if(gems.length===0){
+
+if(level<5){
+
+alert("🎉 通過第 "+level+" 關");
+
+level++;
+
+document.getElementById("level").textContent=level;
+
+createGems();
+
+}else{
+
+winGame();
+return;
+}
+}
+
+let newHead={x:headX,y:headY};
+
+snake.unshift(newHead);
+
+if(!ateGem){
+snake.pop();
+}
+}
+
+function collision(x,y,array){
+
+for(let i=0;i<array.length;i++){
+
+if(x===array[i].x&&y===array[i].y){
+return true;
+}
+}
+return false;
+}
+
+function gameOver(){
+
+clearInterval(game);
+clearInterval(timeInterval);
+
+alert("遊戲結束");
+
+saveScore();
+}
+
+function winGame(){
+
+clearInterval(game);
+clearInterval(timeInterval);
+
+alert("🏆 恭喜完成全部五關！");
+
+saveScore();
+}
+
+function saveScore(){
+
+let name=prompt("請輸入玩家名稱");
+
+if(!name) name="玩家";
+
+let ranks=JSON.parse(
+localStorage.getItem("snakeRanks")
+)||[];
+
+ranks.push({
+name:name,
+score:score,
+time:timer
+});
+
+ranks.sort((a,b)=>{
+
+if(b.score!==a.score)
+return b.score-a.score;
+
+return a.time-b.time;
+
+});
+
+ranks=ranks.slice(0,5);
+
+localStorage.setItem(
+"snakeRanks",
+JSON.stringify(ranks)
+);
+
+showRanks();
+}
+
+function showRanks(){
+
+let ranks=JSON.parse(
+localStorage.getItem("snakeRanks")
+)||[];
+
+let html="";
+
+ranks.forEach(r=>{
+
+html+=`
+<li>
+${r.name}
+-
+${r.score}分
+-
+${r.time}秒
+</li>
+`;
+
+});
+
+document.getElementById("rankList").innerHTML=html;
+}
+
+showRanks();
+
+</script>
+
+</body>
+</html>
